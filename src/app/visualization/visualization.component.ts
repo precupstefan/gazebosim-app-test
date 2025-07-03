@@ -4,6 +4,8 @@ import { Subscription } from 'rxjs';
 
 import { SceneManager } from 'gzweb';
 
+import ROSLIB from 'roslib';
+
 @Component({
   selector: 'gz-visualization',
   templateUrl: 'visualization.component.html',
@@ -15,6 +17,46 @@ import { SceneManager } from 'gzweb';
  *
  */
 export class VisualizationComponent implements OnDestroy {
+
+  private ros: ROSLIB.Ros;
+  private cmdVel: ROSLIB.Topic;
+  private speed = 0.5;
+  private turn = 1.0;
+
+  private linear = { x: 0, y: 0, z: 0 };
+  private angular = { x: 0, y: 0, z: 0 };
+
+  private moveBindings: { [key: string]: [number, number, number, number] } = {
+    'i': [1, 0, 0, 0],
+    'o': [1, 0, 0, -1],
+    'j': [0, 0, 0, 1],
+    'l': [0, 0, 0, -1],
+    'u': [1, 0, 0, 1],
+    ',': [-1, 0, 0, 0],
+    '.': [-1, 0, 0, 1],
+    'm': [-1, 0, 0, -1],
+    'O': [1, -1, 0, 0],
+    'I': [1, 0, 0, 0],
+    'J': [0, 1, 0, 0],
+    'L': [0, -1, 0, 0],
+    'U': [1, 1, 0, 0],
+    '<': [-1, 0, 0, 0],
+    '>': [-1, -1, 0, 0],
+    'M': [-1, 1, 0, 0],
+    't': [0, 0, 1, 0],
+    'b': [0, 0, -1, 0]
+  };
+
+  private speedBindings: { [key: string]: [number, number] } = {
+    'q': [1.1, 1.1],
+    'z': [0.9, 0.9],
+    'w': [1.1, 1.0],
+    'x': [0.9, 1.0],
+    'e': [1.0, 1.1],
+    'c': [1.0, 0.9]
+  };
+
+
   /**
    * Connection status from the Websocket.
    */
@@ -25,6 +67,7 @@ export class VisualizationComponent implements OnDestroy {
    * A simulation should expose a URL to connect to. For testing purposes, we can provide one here.
    */
   public wsUrl: string = 'ws://localhost:9002';
+  public wsUrlROS: string = 'ws://localhost:9090';
 
   /**
    * The Authorization Key to use.
@@ -188,5 +231,67 @@ export class VisualizationComponent implements OnDestroy {
     if (event.key === 'Escape' || event.code === 'Escape') {
       this.sceneMgr.follow('follow_entity', null);
     }
+  }
+
+  public connectRos(){
+    this.ros= new ROSLIB.Ros({
+      url: 'ws://localhost:9090',
+    });
+
+
+    this.ros.on('connection', () => {
+      console.log('✅ Connected to ROS 2 Jazzy via rosbridge_websocket');
+
+      this.cmdVel = new ROSLIB.Topic({
+        ros: this.ros,
+        name: '/cmd_vel',
+        messageType: 'geometry_msgs/msg/Twist', // Use ROS 2-style message types!
+      });
+
+      const twist = new ROSLIB.Message({
+        linear: { x: 0.3, y: 0.0, z: 0.0 },
+        angular: { x: 0.0, y: 0.0, z: 0.5 },
+      });
+
+      // cmdVel.publish(twist);
+      console.log('🚀 Published Twist message');
+    });
+
+    this.ros.on('error', (err) => {
+      console.error('❌ Error connecting to ROS:', err);
+    });
+
+    this.ros.on('close', () => {
+      console.log('🔌 Connection closed');
+    });
+  }
+
+  public RosInput(event: KeyboardEvent): void {
+    const key = event.key;
+    console.log('key', key);
+
+    if (this.moveBindings[key]) {
+      const [x, y, z, th] = this.moveBindings[key];
+      this.linear.x = x * this.speed;
+      this.linear.y = y * this.speed;
+      this.linear.z = z * this.speed;
+      this.angular.z = th * this.turn;
+
+    } else if (this.speedBindings[key]) {
+      const [speedMult, turnMult] = this.speedBindings[key];
+      this.speed *= speedMult;
+      this.turn *= turnMult;
+    } else {
+      // stop
+      this.linear = { x: 0, y: 0, z: 0 };
+      this.angular = { x: 0, y: 0, z: 0 };
+    }
+
+    const twist = new ROSLIB.Message({
+      linear: this.linear,
+      angular: this.angular
+    });
+
+    this.cmdVel.publish(twist);
   }
 }

@@ -58,3 +58,29 @@
   </div>
 
 </div>
+
+<div class="content mat-typography">
+    <div fxLayout="column" fxLayoutGap="20px" fxLayoutAlign="start start">
+        <p>Conntrol the robot.</p>
+
+        <div fxLayoutAlign="start" fxLayoutGap="20px">
+
+            <div fxLayout="row" fxLayoutGap="20px" fxLayoutAlign="start start">
+                <mat-form-field>
+                    <input matInput [(ngModel)]="wsUrlROS" placeholder="Websocket URL">
+                </mat-form-field>
+
+                <mat-form-field>
+                    <input matInput  placeholder="INPUT" (keydown)="RosInput($event)">
+                </mat-form-field>
+               <button mat-raised-button (click)="connectRos()" > <!-- *ngIf="connectionStatus === 'disconnected'">-->
+                    Connect ROS
+                </button>
+
+<!--                <button mat-raised-button (click)="disconnectROS()" *ngIf="connectionStatus !== 'disconnected'">-->
+<!--                    Disconnect ROS-->
+<!--                </button>-->
+            </div>
+        </div>
+    </div>
+</div>
