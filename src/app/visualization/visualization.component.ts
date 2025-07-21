@@ -56,11 +56,13 @@ export class VisualizationComponent implements OnDestroy {
     'c': [1.0, 0.9]
   };
 
+  public vehicleList = [];
 
   /**
    * Connection status from the Websocket.
    */
   public connectionStatus: string = 'disconnected';
+  public rosConnectionStatus: string = 'disconnected';
 
   /**
    * The Websocket URL to connect to.
@@ -103,8 +105,8 @@ export class VisualizationComponent implements OnDestroy {
    * @param snackbar Snackbar used to show notifications.
    * @param ws The Websocket Service used to get data from a Simulation.
    */
-   constructor(
-     public snackBar: MatSnackBar) {
+  constructor(
+      public snackBar: MatSnackBar) {
   }
 
   /**
@@ -123,6 +125,12 @@ export class VisualizationComponent implements OnDestroy {
       websocketKey: this.authKey,
     });
     this.connectionStatus = 'connected';
+    const interval = setInterval(() => {
+      if (this.sceneMgr?.models?.length) {
+        clearInterval(interval);
+        this.loadVehicles();
+      }
+    }, 100);
   }
 
   /**
@@ -152,8 +160,8 @@ export class VisualizationComponent implements OnDestroy {
    */
   public follow(model): void {
     if (model !== undefined && model !== null) {
-        this.following = true;
-        this.sceneMgr.follow(model['gz3dName']);
+      this.following = true;
+      this.sceneMgr.follow(model['gz3dName']);
     } else {
       this.following = false;
       this.sceneMgr.follow(null);
@@ -233,7 +241,19 @@ export class VisualizationComponent implements OnDestroy {
     }
   }
 
-  public connectRos(){
+  public connectRos() {
+    // console.log(this.sceneMgr);
+    // var seen = [];
+    // console.log(JSON.stringify(this.sceneMgr, function (key, val) {
+    //   if (val != null && typeof val == "object") {
+    //     if (seen.indexOf(val) >= 0) {
+    //       return;
+    //     }
+    //     seen.push(val);
+    //   }
+    //   return val;
+    // }));
+
     this.ros= new ROSLIB.Ros({
       url: 'ws://localhost:9090',
     });
@@ -264,6 +284,7 @@ export class VisualizationComponent implements OnDestroy {
     this.ros.on('close', () => {
       console.log('🔌 Connection closed');
     });
+    this.rosConnectionStatus = "connected";
   }
 
   public RosInput(event: KeyboardEvent): void {
@@ -293,5 +314,34 @@ export class VisualizationComponent implements OnDestroy {
     });
 
     this.cmdVel.publish(twist);
+    console.log(this.cmdVel);
+  }
+
+  public loadVehicles(): void {
+    var models: any[] = this.sceneMgr.models;
+    this.vehicleList = models.filter(model => model.name.includes("vehicle"));
+    this.vehicleList.push({name: "ALL"})
+    console.log(this.vehicleList)
+    // models.filter(model => model.)
+  }
+
+  public onSelectChange(model): void {
+    if(model.name === "ALL"){
+      this.follow(null);
+      this.cmdVel = new ROSLIB.Topic({
+        ros: this.ros,
+        name: `/cmd_vel`,
+        messageType: 'geometry_msgs/msg/Twist', // Use ROS 2-style message types!
+      });
+    }
+    else {
+      this.follow(model)
+      this.cmdVel = new ROSLIB.Topic({
+        ros: this.ros,
+        name: `/${model.name}/cmd_vel`,
+        messageType: 'geometry_msgs/msg/Twist', // Use ROS 2-style message types!
+      });
+    }
+    console.log(this.cmdVel);
   }
 }
